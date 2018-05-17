@@ -1,0 +1,165 @@
+<!-- 
+This file is for building Workbrain 5.0 (build #90).
+To prepare the build the following folder structure needs to be created.
+
+1. ant_build folder contains ant scripts and the build target folder for .class files
+
+2.core\lib folder contrains all the Workbrain dependencies(all the jar files from Workbrain server - including customer.jar or excluding customer jar, doesn't matter), 
+  and J2EE servlet.jar  file for some class to compile.
+
+  3. etc, J2EE, Java folders are checked out from SVN repository, without any modifications.
+
+  4. need Java 1.4 installed C:\Java\j2sdk1.4.2_19.  and apache ant installed
+  
+  5. to do checkout, we need tortoiseSVN installed.
+  
+  
+  
+C:\Users\mark.zhang\EclipseWorkspace\createBuild>copy .\target\createBuild-0.0.2-SNAPSHOT.jar c:\temp\WB_5.0_BUILD_90\ant-lib\
+
+
+-->
+
+<!--
+├───ant_build
+│   
+├───core
+│   └───lib
+├───etc
+│   ├───data_files
+│   ├───migration
+│   ├───reports
+│   └───sql
+├───J2EE
+│   └───workbrain
+│       ├───lib
+│       └───workbrain
+└───Java
+    ├───images
+    ├───lib
+    └───src
+-->
+
+<!--	
+##############################################################################
+## SVN command get the list of the changed files between two revisions
+##   svn diff - -summarize -r<rev-of-commit>:<rev-of-commit - 1>
+##   example: svn diff - -summarize -r2264:2255
+##############################################################################
+## SVN command to get the list of changed files from a given revision
+##   example to get changed files from revision 2264: 
+##   svn log - -verbose -r2264
+##############################################################################
+## SVN command to get the changes from last update
+##    svn status - -show-updates 
+## or svn status -u
+## 
+############################################################################
+##So svn log <url> -r
+##  {2008-09-19}:{2008-09-26} will get all changes for the past week, including today
+############################################################################
+
+##SVN command to checkout source code
+##svn checkout https://subversion.assembla.com/svn/rakeshmoddi%5Ephsa/
+##branches/WB_5.0_BUILD_90/ .
+	
+
+-->
+<project name="build-${app.name}" default="help" basedir="."
+xmlns:if="ant:if" xmlns:unless="ant:unless">
+ 
+<echoproperties/>
+    <target name="help">
+	 <echo message="This build shows how to get help."/>
+	  <echo>
+	  
+       ant all -DFrom='From Revision' -DTo='To Revision'
+       ant checkout					-Checkout WB source code from SVN
+	   ant clean					-Delete build\classes folder
+	   ant cleanall					-Delete build\classes folder, and source code folders(etc, Java, J2EE folders)
+	   ant getchanges				-Get list of files changed from Revision #### to Revision ####, result will be saved in build/file_changes_yyyyMMDD.txt
+	   ant createdailybuild         create daily build
+	   </echo>
+    </target>
+
+  
+	
+    <target name="all">
+	    <input unless:set="From" message="Please Input From Revision (Exclusive) :" addproperty="From" />
+		<input unless:set="To" message="Please Input To Revision (Inclusive) :" addproperty="To" />
+		<ant antfile="build-make-vss.xml"   target="cleanall" />
+		<ant antfile="build-make-vss.xml"   target="checkout" />
+		<ant antfile="build-make-vss.xml"   target="getchanges" />
+		<ant antfile="build.xml"  dir="ear_build"     target="all" />
+		<ant antfile="build-make-vss.xml"   target="createdailybuild" />
+					
+    </target>
+
+    <target name="compile" depends="clean">
+    	<ant antfile="build-make-vss.xml"
+             target="updatebuildinfo" />
+		<ant antfile="build-make-vss.xml"
+             target="compile" />			 
+    </target>	
+   <target name="clean">
+    	<ant antfile="build-make-vss.xml"
+             target="clean" />
+    </target>	
+   <target name="cleanall">
+    	<ant antfile="build-make-vss.xml"
+             target="cleanall" />
+    </target>		
+	
+
+
+    <target name="checkout">
+    	<ant antfile="build-make-vss.xml"
+             target="checkout" />
+    </target>
+    
+	<target name="getchanges">
+    	<ant antfile="build-make-vss.xml"
+             target="getchanges" />
+    </target>	
+	
+	<target name="unzip">
+    	<ant antfile="build-make-vss.xml"
+             target="unzip" />
+    </target>
+	<target name="jar">
+    	<ant antfile="build-make-vss.xml"
+             target="jar" />
+    </target>	
+	
+	<target name="zip">
+    	<ant antfile="build-make-vss.xml"
+             target="zip" />
+    </target>	
+
+	<target name="copyjar">
+    	<ant antfile="build-make-vss.xml"
+             target="getLatestCustomerJar" />
+    </target>	
+	
+	
+	 <target name="createdailybuild">
+    	<ant antfile="build-make-vss.xml"
+             target="createdailybuild" />
+    </target>
+	<target name="mytest">
+			
+				<if>
+					<isset property="To" />
+						<then>
+							<ant  antfile="build-make-vss.xml"             target="mytest" />
+						</then>
+				</if>
+		
+
+    	
+    </target>	
+
+	
+
+	
+</project>

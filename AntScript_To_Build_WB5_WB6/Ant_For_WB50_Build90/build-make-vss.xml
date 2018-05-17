@@ -1,0 +1,338 @@
+<project name="build-make-${app.name}" default="all" basedir="."
+xmlns:if="ant:if" xmlns:unless="ant:unless">
+    <!-- Commented stars designate a new heading. -->
+    
+    <!-- ************************************************** -->
+	<!--ant properties -->
+    <property file="make.properties" />
+	
+	<!-- file to keep tracking build number and build date -->
+    <property file="version.make.properties" />
+	
+	
+    <!-- ************************************************** -->
+    <property name="compile.debug" value="true" />
+    <property name="compile.deprecation" value="false" />
+    <property name="compile.optimize" value="true" />
+
+    <!-- ************************************************** -->
+    <path id="compile.classpath">
+        <fileset dir="${wb.java.lib}">
+            <include name="*.jar" />
+            <include name="*.zip" />
+        </fileset>
+        <fileset dir="${wb.j2ee.lib}">
+            <include name="*.jar" />
+            <include name="*.zip" />
+        </fileset>
+        <fileset dir="${core.lib.home}">
+            <include name="*.jar" />
+            <include name="*.zip" />
+        </fileset>
+    </path>
+	
+	 <path id="ant.custom.classpath">
+	   <fileset dir="${basedir}">
+            <include name="*.jar" />
+            <include name="*.zip" />
+        </fileset>
+		 <fileset dir="${basedir}/ant-lib">
+            <include name="*.jar" />
+            <include name="*.zip" />
+        </fileset>
+	 </path>
+
+	<!-- ************************************************** -->
+	<tstamp>
+	    <format property="date.yyyyMMdd" pattern="yyyyMMdd"/>
+	</tstamp>
+	
+	<tstamp>
+	    <format property="date.yyyyMM" pattern="yyyyMM"/>
+	</tstamp>
+	
+	
+	<tstamp>
+	    <format property="datetime.stamp" pattern="yyyyMMdd HH:mm:ss"/>
+	</tstamp>
+	
+	<tstamp>
+	    <format property="date.yyyyMMddHHmm" pattern="yyyyMMddHHmm"/>
+	</tstamp>
+
+
+  <!-- ************************************************** -->
+  
+   <target name="copyBuildFiles" description="1.copy new/added class/inner class files to corresponding customer folders, also copy .jsp files, .js files to war file folder." >
+    <record name="${app.build.home}/daily_build_log_${date.yyyyMMdd}.txt" action="start" append="false" loglevel="verbose"/>
+        <taskdef name="copyBuildFiles" classpathref="ant.custom.classpath"  classname="com.phsa.app.sup.CreateBuildTask"/>
+        <copyBuildFiles buildHomeDaily="${build.home.daily}" buildHomeMaster="${build.home.master}"  buildHomeWorking="${build.home.working}"/>
+    <record name="${app.build.home}/daily_build_log_${date.yyyyMMdd}.txt" action="stop" />	
+    <exec executable="hostname" outputproperty="computer.hostname"/>	
+	<echo file="${app.build.home}/daily_build_log_${date.yyyyMMdd}.txt" append="true">========Daily Built Log -> Built on [${computer.hostname}] in Folder: [${build.home.working}];  Built By:[${user.name}] at Time:[${datetime.stamp}] </echo>
+   </target>
+   
+   
+    <!-- ************************************************** -->
+ 
+   <target name="changelogfileexists">
+		<available  file= "${app.build.home}/file_change_log_${date.yyyyMMdd}.txt"  property="change.log.file.exists"/>
+		<fail message="Today's file change log file doesn't exist, please run 'ant getchanges' to create the file 'file_change_log_YYYYMMDD.txt'" unless="change.log.file.exists" />
+   </target>
+ 
+ 
+ 
+    <target name="createdailybuild" depends="changelogfileexists"  if="change.log.file.exists" description="compile .java files to .class files, get the more recent customer.jar, unzip customer.jar, copy new .class files to customer. zip customer to jar file customer_yyyyMMdd.jar" >
+        <property file="version.make.properties" />
+		<antcall target="getLatestMasterBinary" />
+		<antcall target="getLatestCustomerJar" />
+		<antcall target="compile" />
+		<antcall target="unzip" />
+		<antcall target="copyBuildFiles" />
+		<antcall target="zip" />
+		<antcall target="copyJarToBinaryLib" />
+		<antcall target="updateLocalCoreWithCustomerJar" />
+		<antcall target="copyTodaysBuildToDailyBuildFoder" />
+		<antcall target="copyTodaysBuildToMasterBuildFoder" />
+		<antcall target="updatebuildinfo" />
+    </target>
+
+	<target name="getLatestMasterBinary" description="get latest binary(war) files from master build folder for daily build to update files - update .jsp files, .js files etc,. and also the customer.jar file"> 
+	    <delete dir="${build.home.working}/binary" />
+		<copy  todir="${build.home.working}/binary" preservelastmodified="true">
+           <fileset dir="${build.home.master}/${core.version}" />
+		</copy>
+        
+	</target>
+	
+	<target name="getLatestCustomerJar" description="get latest customer.jar file from master build folder for daily build to unzip it, update new/changed class files and zip it back as jar file with timestamp.Also update the local core lib before compile"> 
+		<copy  file="${build.home.master}/${core.version}/lib/customer.jar" tofile="${build.home.working}/customer.jar" overwrite="true"  preservelastmodified="true"/>
+		<copy  file="${build.home.master}/${core.version}/lib/customer.jar" tofile="${basedir}/core/lib/customer.jar" overwrite="true" preservelastmodified="true"/>
+        
+	</target>
+	
+	<target name="updateLocalCoreWithCustomerJar" description="update the local core lib with new created customer.jar. getLatestCustomerJar does another update, but it won't hurt to have this task."> 
+		<copy  file="${build.home.master}/${core.version}/lib/customer.jar" tofile="${basedir}/core/lib/customer.jar" overwrite="true" preservelastmodified="true"/>
+	</target>
+	
+
+	<target name="copyJarToBinaryLib" description="copy the newly created jar file (customer_yyyyMMdd.jar to customer.jar in lib folder. it becomes part of the binary build"> 
+		<copy   file="${build.home.working}/customer_${date.yyyyMMdd}.jar" tofile="${build.home.working}/binary/lib/customer.jar" overwrite="true" preservelastmodified="true"/>
+	</target>
+	
+	
+	<target name="copyTodaysBuildToDailyBuildFoder" description="copy files to daily build folder phsabc_root_Apps_Workbrain_Deployments_Workbrain 5_Release 90_DailyBuild"> 
+		<copy   todir="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/${core.version}-${date.yyyyMMdd}/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/binary"  />
+		</copy>
+		<copy   todir="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/sql/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/sql/" erroronmissingdir="false" />
+		</copy>
+		<copy   todir="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/migration/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/migration/" erroronmissingdir="false" />
+		</copy>
+		<copy   todir="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/data_file/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/data_file/" erroronmissingdir="false" />
+		</copy>
+		<copy   todir="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/report/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/report/" erroronmissingdir="false"  />
+		</copy>
+
+		<copy  file="${app.build.home}/daily_build_log_${date.yyyyMMdd}.txt" tofile="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/daily_build_log_${date.yyyyMMdd}.txt" overwrite="true" preservelastmodified="true"/>
+		<copy  file="${app.build.home}/file_change_log_${date.yyyyMMdd}.txt" tofile="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/file_change_log_${date.yyyyMMdd}.txt" overwrite="true" preservelastmodified="true"/>
+		<!-- Archvie the daily build since there might be multiple builds in the same day, or different build for different environment.  we want to keep all the builds in yyyyMMddHHmm folder, and the latest in yyyyMMdd folder -->
+		<copy   todir="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMddHHmm}/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.daily}/${date.yyyyMM}/${date.yyyyMMdd}/"  />
+		</copy>
+		
+		
+	</target>
+	
+	
+	
+	<target name="copyTodaysBuildToMasterBuildFoder" description="copy files to daily build folder phsabc_root_Apps_Workbrain_Deployments_Workbrain 5_Release 90_MasterBuild"> 
+		<copy   todir="${build.home.master}/${core.version}/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/binary"  />
+		</copy>
+		<copy   todir="${build.home.master}/sql/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/sql/" erroronmissingdir="false" />
+		</copy>
+		<copy   todir="${build.home.master}/migration/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/migration/" erroronmissingdir="false" />
+		</copy>
+		<copy   todir="${build.home.master}/data_file/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/data_file/" erroronmissingdir="false" />
+		</copy>
+		<copy   todir="${build.home.master}/report/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/report/" erroronmissingdir="false"  />
+		</copy>
+        <!-- copy lib jar files to master build folder's lib folder -->
+		<copy   todir="${build.home.master}/${core.version}/lib/" overwrite="true" preservelastmodified="true">
+		  <fileset dir="${build.home.working}/binary/lib/"  />
+		</copy>
+		
+		<copy  file="${app.build.home}/daily_build_log_${date.yyyyMMdd}.txt" tofile="${build.home.master}/daily_build_log_${date.yyyyMMdd}.txt" overwrite="true" preservelastmodified="true"/>
+		<copy  file="${app.build.home}/file_change_log_${date.yyyyMMdd}.txt" tofile="${build.home.master}/file_change_log_${date.yyyyMMdd}.txt" overwrite="true" preservelastmodified="true"/>
+		
+	</target>
+	
+	
+   
+    <!-- ************************************************** -->
+    <!--target name="all">
+        
+        <antcall target="clean" />
+		<antcall target="compile" />
+        <property file="version.make.properties" />
+        <antcall target="updatebuildinfo" />
+		
+    </target -->
+
+	
+    <!-- ************************************************** -->
+	
+    <target name="compile" description="compile">
+        <mkdir dir="${app.build.home}" />
+        <mkdir dir="${app.classes.home}" />
+        <javac srcdir="${app.src.java}"
+               destdir="${app.classes.home}"
+               debug="${compile.debug}"
+               deprecation="${compile.deprecation}"
+               optimize="${compile.optimize}"
+               includeAntRuntime="no"
+        	   excludes="**/test/*.*, com/phsa/app/modules/pthod/ShiftAvailabilityReportTest.*, com/phsa/PasswordRandomizerUtil.*"   
+        	   fork="true"
+               compiler="${javac.compiler}"
+               executable="${javac.exec}"
+			   memoryinitialsize="512m"
+               memorymaximumsize="1024m">
+            <classpath refid="compile.classpath" />
+        </javac>
+    	<mkdir dir="${app.classes.cert}" />
+		<copy todir="${app.classes.cert}">
+            <fileset dir="${app.src.cert}" />
+        </copy>
+    </target>
+
+	
+	
+    <!-- ************************************************** -->    
+    <target name="clean" description="clean">
+        <delete dir="${app.build.home}/classes" />
+        <!-- Delete only if we can get libraries from Source control -->
+		<!-- <delete dir="${make.lib.home}" /> -->
+    </target>
+	
+	<target name="cleanbuild" description="clean all the new builds, delete etc,java, J2EE; delete classes; delete customer_yyyyMMdd.jar">
+        <delete dir="${app.build.home}/classes" />
+		<delete dir="${build.home.working}/customer" />
+		<delete file="${build.home.working}/customer_${date.yyyyMMdd}.jar" />
+		<delete dir="${app.build.home}/sql" />
+		<delete dir="${app.build.home}/migration" />
+		<delete dir="${app.build.home}/data_file" />
+		<delete dir="${app.build.home}/report" />
+		<delete dir="${app.build.home}/binary" />
+
+        <!-- Delete only if we can get libraries from Source control -->
+		<!-- <delete dir="${make.lib.home}" /> -->
+    </target>	
+    
+	<target name="cleanall" description="clean all, delete etc,java, J2EE;delete classes; delete customer.jar" depends="deletesource">
+        <delete dir="${app.build.home}/classes" />
+		<delete file="${build.home.working}/customer.jar" />
+		<delete dir="${build.home.working}/customer" />
+		<delete file="${build.home.working}/customer_${date.yyyyMMdd}.jar" />
+		<delete dir="${app.build.home}/sql" />
+		<delete dir="${app.build.home}/migration" />
+		<delete dir="${app.build.home}/data_file" />
+		<delete dir="${app.build.home}/report" />
+		<delete dir="${app.build.home}/binary" />
+		<delete file="${app.build.home}/.project" />
+
+        <!-- Delete only if we can get libraries from Source control -->
+		<!-- <delete dir="${make.lib.home}" /> -->
+    </target>	
+	
+	<target name="deletesource" description="Delete Previous Source Code">
+        <delete dir="${basedir}/Java" />   
+        <delete dir="${basedir}/J2EE" /> 
+        <delete dir="${basedir}/etc" />     				
+		
+    </target>
+
+  
+    <!-- ************************************************** -->
+    
+    
+  
+
+    <!-- ************************************************** -->
+    <target name="updatebuildinfo" description="info build update">
+        <buildnumber file="${basedir}/version.make.properties" />        
+        <propertyfile file="${basedir}/version.make.properties">
+            <entry key="build.date"
+                   type="date"
+                   value="now"
+                   pattern="yyyyMMddhhmm" />
+        </propertyfile>
+    </target>
+	
+	
+	<target name="getchanges">
+		<mkdir dir="${app.build.home}" />
+		<echo>Please input From Revision #### (exclusive) and To Revision #### (inclusive) to get the changes made between two revisions.		</echo>
+		<input unless:set="From" message="Please Input From Revision (Exclusive) :" addproperty="From" />
+		<input unless:set="To" message="Please Input To Revision (Inclusive) :" addproperty="To" />
+		<echo if:set="To" message="Getting changes from SVN Revision: ${From} to Revision: ${To}" />
+		
+		<exec executable="svn" dir=".">
+			<arg value="diff" />
+			<arg value="--summarize" />
+			<arg value="-r" />
+			<arg value="${From}:${To}" />
+			<redirector output="${app.build.home}/file_change_log_${date.yyyyMMdd}.txt" alwayslog="true"/>   
+		</exec>
+		<echo file="${app.build.home}/file_change_log_${date.yyyyMMdd}.txt" append="true">========Change Log ->  From Revision:[${From}] To Revision:[${To}];  Built By:[${user.name}] Time:[${datetime.stamp}] </echo>
+	</target>
+
+	<target name="checkout">
+		<exec executable="svn" dir=".">
+			<arg value="checkout" />
+			<arg value="${app.svn.url}" />
+			<arg value ="."/>
+		</exec>
+	</target>	
+    
+	<target name="unzip">
+		<delete dir="${app.build.home}/customer"  />   
+	    <unzip src="${build.home.working}/customer.jar" dest="${build.home.working}/customer"/>
+	</target>
+	<!-- DO NOT USE jar task since the file size are different once we unzip and jar the class files.
+		zips all files in the customer directory into a file called customer.jar in the ${dist} directory.
+	If customer.jar doesn't exist, it is created; otherwise it is updated with the new/changed files.
+	-->
+	<target name="zip">
+	  <delete file="${app.build.home}/customer_${date.yyyyMMdd}.jar"  />   
+	    <zip destfile="${app.build.home}/customer_${date.yyyyMMdd}.jar" basedir="${app.build.home}/customer" update="true"/>
+	</target>
+	
+	
+    <!-- ************************************************** -->
+	
+	
+	
+	<target name="mytest">
+
+		
+		<input unless:set="From" message="Please Input From Revision (Exclusive) :" addproperty="From" />
+		<input unless:set="To" message="Please Input To Revision (Inclusive) :" addproperty="To" />
+		<echo if:set="To" message="Getting changes from SVN Revision: ${From} to Revision: ${To}" />
+	</target>
+	
+  <!--   
+   <target name="archive" description="archive">
+        <copy file="${app.dist.home}/${app.dist.name}-${build.number}.ear"
+              tofile="${app.archive.home}/${app.dist.name}-${build.number}.ear" />
+    </target>
+  -->
+</project>
